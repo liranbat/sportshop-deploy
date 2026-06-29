@@ -94,11 +94,18 @@ services:
       # the JAR into this dir on startup. Bind-mounted so the files survive
       # `docker compose down` (without -v).
       - ./.data/images:/var/sportshop/images
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
 
   web:
     image: sportshop-web:${WEB_TAG:-0.0.1}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       # 46443 is the only host port we publish: Caddy terminates TLS, serves the
       # baked-in SPA, reverse-proxies /api/* + /images/* to backend.
@@ -107,3 +114,11 @@ services:
       # Persist the auto-generated CA + leaf cert across container recreations
       # so you don't have to re-trust the CA on every rebuild.
       - ./.data/caddy:/data
+    healthcheck:
+      # Caddy's admin API on 127.0.0.1:2019 is enabled by default; a 200 from
+      # /config/ proves the process is alive and parsed its Caddyfile.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
