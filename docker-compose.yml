@@ -71,6 +71,8 @@ services:
     image: postgres:18-alpine
     # Postgres creds in ./.env.prod.db.
     env_file: ./.env.prod.db
+    ports:
+      - "45432:5432"
     volumes:
       # PG18+ mounts at /var/lib/postgresql.
       - ./.data/postgres:/var/lib/postgresql
