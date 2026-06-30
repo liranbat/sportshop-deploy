@@ -85,7 +85,7 @@ services:
   backend:
     # Override via BACKEND_IMAGE to pin a version (e.g. ghcr.io/liranbat/sportshop-backend:main.1.0.5)
     # or to point at a locally-built image (e.g. sportshop-backend:0.0.1-SNAPSHOT).
-    image: ${BACKEND_IMAGE:-ghcr.io/liranbat/sportshop-backend:feature-ci-latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/liranbat/sportshop-backend:main-latest}
     depends_on:
       db:
         condition: service_healthy
