@@ -1,8 +1,8 @@
 # ============================================================================
 # Sportshop prod stack
 #
-#   # one-time: build the app images (the stack pulls db + caddy from registry)
-#   cd ../sportshop-backend  && mvn spring-boot:build-image
+#   # backend is pulled from GHCR by default (override via BACKEND_IMAGE).
+#   # frontend still needs a local build until it has its own CI:
 #   cd ../sportshop-frontend && docker build -t sportshop-web:0.0.1 .
 #
 #   cd ../sportshop-deploy
@@ -83,7 +83,9 @@ services:
       retries: 12
 
   backend:
-    image: sportshop-backend:${BACKEND_TAG:-0.0.1-SNAPSHOT}
+    # Override via BACKEND_IMAGE to pin a version (e.g. ghcr.io/liranbat/sportshop-backend:main.1.0.5)
+    # or to point at a locally-built image (e.g. sportshop-backend:0.0.1-SNAPSHOT).
+    image: ${BACKEND_IMAGE:-ghcr.io/liranbat/sportshop-backend:feature-ci-latest}
     depends_on:
       db:
         condition: service_healthy
