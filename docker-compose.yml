@@ -2,10 +2,10 @@
 # Sportshop prod stack
 #
 #   # one-time: build the app images (the stack pulls db + caddy from registry)
-#   cd ../backend/sportshop && mvn spring-boot:build-image
-#   cd ../../frontend       && docker build -t sportshop-web:0.0.1 .
+#   cd ../sportshop-backend  && mvn spring-boot:build-image
+#   cd ../sportshop-frontend && docker build -t sportshop-web:0.0.1 .
 #
-#   cd ../../deploy
+#   cd ../sportshop-deploy
 #   docker compose up -d        # bring it up
 #   docker compose down         # tear it down
 #   docker compose down -v      # tear + wipe DB / images / Caddy data
@@ -54,7 +54,7 @@
 #     mkcert -cert-file certs/localhost.pem \
 #            -key-file  certs/localhost-key.pem \
 #            localhost 127.0.0.1
-#   …and replace `tls internal` in ../frontend/Caddyfile with:
+#   …and replace `tls internal` in ../sportshop-frontend/Caddyfile with:
 #     tls /etc/caddy/certs/localhost.pem /etc/caddy/certs/localhost-key.pem
 #   plus add `./certs:/etc/caddy/certs:ro` to the web service volumes below.
 #
@@ -87,8 +87,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Backend config in ../backend/sportshop/.env.prod.
-    env_file: ../backend/sportshop/.env.prod
+    # Backend config in ../sportshop-backend/.env.prod.
+    env_file: ../sportshop-backend/.env.prod
     volumes:
       # Backend writes uploaded images here; SeedImagesBootstrap also seeds from
       # the JAR into this dir on startup. Bind-mounted so the files survive
