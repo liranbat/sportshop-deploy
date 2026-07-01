@@ -105,7 +105,7 @@ services:
   web:
     # Override via WEB_IMAGE to pin a version (e.g. ghcr.io/liranbat/sportshop-frontend:main.1.0.5)
     # or to point at a locally-built image (e.g. sportshop-web:0.0.1).
-    image: ${WEB_IMAGE:-ghcr.io/liranbat/sportshop-frontend:feature-ci-latest}
+    image: ${WEB_IMAGE:-ghcr.io/liranbat/sportshop-frontend:main-latest}
     depends_on:
       backend:
         condition: service_healthy
