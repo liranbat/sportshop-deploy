@@ -1,0 +1,130 @@
+# ============================================================================
+# Sportshop prod stack
+#
+#   # backend + web are pulled from GHCR by default
+#   # (override via BACKEND_IMAGE / WEB_IMAGE).
+#
+#   cd ../sportshop-deploy
+#   docker compose up -d        # bring it up
+#   docker compose down         # tear it down
+#   docker compose down -v      # tear + wipe DB / images / Caddy data
+#
+# Open https://localhost:46443 in a browser after `up`.
+#
+# ----------------------------------------------------------------------------
+# One-time host setup: trusting the Caddy root CA
+# ----------------------------------------------------------------------------
+# Caddy uses `tls internal` to generate a self-signed cert + local CA at
+# .data/caddy/pki/authorities/local/root.crt (relative to deploy/) after the
+# first `up`. Until you trust that CA, browsers show "Your connection is not
+# private".
+#
+# All paths below assume you're running from the `deploy/` folder.
+#
+# Pick ONE of:
+#
+# OPTION A — Trust the Caddy root CA in the OS trust store (recommended).
+#   Windows (PowerShell, Run as Administrator):
+#     certutil -addstore -f Root .\.data\caddy\pki\authorities\local\root.crt
+#
+#   macOS:
+#     sudo security add-trusted-cert -d -r trustRoot \
+#       -k /Library/Keychains/System.keychain \
+#       ./.data/caddy/pki/authorities/local/root.crt
+#
+#   Linux (Debian/Ubuntu):
+#     sudo cp ./.data/caddy/pki/authorities/local/root.crt \
+#       /usr/local/share/ca-certificates/sportshop-caddy.crt
+#     sudo update-ca-certificates
+#
+#   Linux (RHEL/Fedora):
+#     sudo cp ./.data/caddy/pki/authorities/local/root.crt \
+#       /etc/pki/ca-trust/source/anchors/sportshop-caddy.crt
+#     sudo update-ca-trust
+#
+#   Firefox keeps its own NSS trust store on every OS — also import the
+#   same root.crt via Settings → Privacy & Security → Certificates →
+#   View Certificates → Authorities → Import.
+#
+# OPTION B — Cross-OS via mkcert (https://github.com/FiloSottile/mkcert).
+#   Install mkcert once (choco/scoop/brew/apt/dnf or static binary), then:
+#     mkcert -install
+#     mkdir -p certs
+#     mkcert -cert-file certs/localhost.pem \
+#            -key-file  certs/localhost-key.pem \
+#            localhost 127.0.0.1
+#   …and replace `tls internal` in ../sportshop-frontend/Caddyfile with:
+#     tls /etc/caddy/certs/localhost.pem /etc/caddy/certs/localhost-key.pem
+#   plus add `./certs:/etc/caddy/certs:ro` to the web service volumes below.
+#
+# OPTION C — Skip trust; click through the browser warning.
+#   Visit https://localhost:46443 → "Advanced" → "Proceed to localhost
+#   (unsafe)" in Chrome/Edge, or "Accept the Risk and Continue" in Firefox.
+#   The app is fully functional; you just get a red "Not secure" badge and a
+#   NET::ERR_CERT_AUTHORITY_INVALID interstitial on first visit per browser
+#   profile until the cert rotates (~12 months).
+# ============================================================================
+
+services:
+  db:
+    image: postgres:18-alpine
+    # Postgres creds in ./.env.prod.db.
+    env_file: ./.env.prod.db
+    ports:
+      - "45432:5432"
+    volumes:
+      # PG18+ mounts at /var/lib/postgresql.
+      - ./.data/postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    # Override via BACKEND_IMAGE to pin a version (e.g. ghcr.io/liranbat/sportshop-backend:main.1.0.5)
+    # or to point at a locally-built image (e.g. sportshop-backend:0.0.1-SNAPSHOT).
+    image: ${BACKEND_IMAGE:-ghcr.io/liranbat/sportshop-backend:main-latest}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Backend config in ../sportshop-backend/.env.prod.
+    env_file: ../sportshop-backend/.env.prod
+    volumes:
+      # Backend writes uploaded images here; SeedImagesBootstrap also seeds from
+      # the JAR into this dir on startup. Bind-mounted so the files survive
+      # `docker compose down` (without -v).
+      - ./.data/images:/var/sportshop/images
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  web:
+    # Override via WEB_IMAGE to pin a version (e.g. ghcr.io/liranbat/sportshop-frontend:main.1.0.5)
+    # or to point at a locally-built image (e.g. sportshop-web:0.0.1).
+    image: ${WEB_IMAGE:-ghcr.io/liranbat/sportshop-frontend:main-latest}
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Frontend runtime config in ../sportshop-frontend/.env.prod. Caddy renders
+    # these into window.APP_CONFIG on each GET /config.js (see Caddyfile).
+    env_file: ../sportshop-frontend/.env.prod
+    ports:
+      # 46443 is the only host port we publish: Caddy terminates TLS, serves the
+      # baked-in SPA, reverse-proxies /api/* + /images/* to backend.
+      - "46443:443"
+    volumes:
+      # Persist the auto-generated CA + leaf cert across container recreations
+      # so you don't have to re-trust the CA on every rebuild.
+      - ./.data/caddy:/data
+    healthcheck:
+      # Caddy's admin API on 127.0.0.1:2019 is enabled by default; a 200 from
+      # /config/ proves the process is alive and parsed its Caddyfile.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 5s

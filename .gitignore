@@ -1,0 +1,9 @@
+# Local-only env; keep the template.
+.env*
+!.env.prod.db.example
+
+# Runtime bind-mounts (created by docker compose up).
+.data/
+
+# mkcert private keys (only if you pick the mkcert TLS trust path).
+certs/
