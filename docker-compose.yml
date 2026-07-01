@@ -1,9 +1,8 @@
 # ============================================================================
 # Sportshop prod stack
 #
-#   # backend is pulled from GHCR by default (override via BACKEND_IMAGE).
-#   # frontend still needs a local build until it has its own CI:
-#   cd ../sportshop-frontend && docker build -t sportshop-web:0.0.1 .
+#   # backend + web are pulled from GHCR by default
+#   # (override via BACKEND_IMAGE / WEB_IMAGE).
 #
 #   cd ../sportshop-deploy
 #   docker compose up -d        # bring it up
@@ -104,10 +103,15 @@ services:
       start_period: 20s
 
   web:
-    image: sportshop-web:${WEB_TAG:-0.0.1}
+    # Override via WEB_IMAGE to pin a version (e.g. ghcr.io/liranbat/sportshop-frontend:main.1.0.5)
+    # or to point at a locally-built image (e.g. sportshop-web:0.0.1).
+    image: ${WEB_IMAGE:-ghcr.io/liranbat/sportshop-frontend:feature-ci-latest}
     depends_on:
       backend:
         condition: service_healthy
+    # Frontend runtime config in ../sportshop-frontend/.env.prod. Caddy renders
+    # these into window.APP_CONFIG on each GET /config.js (see Caddyfile).
+    env_file: ../sportshop-frontend/.env.prod
     ports:
       # 46443 is the only host port we publish: Caddy terminates TLS, serves the
       # baked-in SPA, reverse-proxies /api/* + /images/* to backend.
